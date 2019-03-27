@@ -18,3 +18,9 @@ You need some form of Python 3, I usually use anaconda or similar
 wulff@remaquery$  python remaquery.py  --help
 ```
 
+# Example
+```bash
+python remaquery.py  ../2019-03-25.json list --category   --maxcount 3   --quarter --plot
+```
+![Sort top items by category](category.jpg)
+
