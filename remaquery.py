@@ -32,6 +32,8 @@ import collections
 import datetime
 import click
 from collections import OrderedDict
+import matplotlib.pyplot as plt
+import pandas as pd
 
 class rema:
     def __init__(self,file):
@@ -58,7 +60,7 @@ class rema:
             
         self.printList(groups)
 
-    def printOrderByGroupOrCategory(self,maxcount=10,month = False,category=False):
+    def printOrderByGroupOrCategory(self,maxcount=10,month = False,category=False,keyName=None,plot=False,quarter=False):
         summary = dict()
 
         if self.categories is None and category:
@@ -70,6 +72,8 @@ class rema:
             d = datetime.datetime.utcfromtimestamp(int(datestr[:-3]))
             if(month):
                 header_key = str(d.year) + "-" + str(d.month)
+            elif(quarter):
+                header_key = str(d.year) + "-Q" + str(pd.Timestamp(d).quarter)
             else:
                 header_key = str(d.year)
             if(header_key not in summary):
@@ -78,14 +82,21 @@ class rema:
                 key = item["ProductGroupDescription"]
                 if(category and key in self.categories ):
                     key = self.categories[key]
+               # print(json.dumps(item,indent=4))
+                if(keyName and key == keyName):
+                    key = item['ProductDescription']
+                elif(keyName):
+                    continue
                 if(key in summary[header_key]):
                     summary[header_key][key] += item["Amount"]
                 else:
                     summary[header_key][key] = item["Amount"]
-        self.printTransactionSummary(summary,maxcount)
+
+        self.printTransactionSummary(summary,maxcount,plot)
+        
     
 
-    def printTransactionSummary(self,summary,maxcount):
+    def printTransactionSummary(self,summary,maxcount,plot):
         data = OrderedDict()
         for header_key in summary:
             transactions = summary[header_key]
@@ -98,21 +109,52 @@ class rema:
                 else:
                     count += 1
                 data[header_key].append((s[1],s[0]))
-        self.printDictWithTouple(data)
-
-    
+        if(plot):
+            self.plotDictWithTouple(data)
+            pass
+        else:
+            self.printDictWithTouple(data)
 
     def printList(self,data):
+        """Print a list of items"""
         if(self.oformat == "json"):
             print(json.dumps(data,indent=4))
         else:
             for el in data:
                 print(el)
 
-    #- Print function expects the following:
-    # Ordered dictionary headers as keys, where each item in the dict is a touple
-    # The touple needs to be (number, description)
+    def plotDictWithTouple(self,data):
+        """Print ordered dictionary where each item is a (number,description) touple"""
+        pdata = dict()
+        #- Reorganize data
+        for key in data:
+            for el in data[key]:
+                val = el[0]
+                name = el[1]
+                if name not in pdata:
+                    pdata[name] = dict()
+                    pdata[name]['yval'] = list()
+                    pdata[name]['xval'] = list()
+                pdata[name]['yval'].append(val)
+                pdata[name]['xval'].append(key)
+        
+        
+        #with plt.xkcd():
+        for key in pdata:
+            plt.plot(pdata[key]['xval'],pdata[key]['yval'],label=key)
+        plt.xlabel('Date [n]')
+        plt.ylabel("Kostnad [kr]")
+        plt.legend()
+        plt.xticks(rotation=90)
+        plt.savefig("plot.jpg")
+            #plt.xlim([datetime.date(2016, 1, 1), datetime.datetime.now()])
+            #plt.autoscale() 
+        
+        plt.show()
+
+
     def printDictWithTouple(self,data):
+        """Print ordered dictionary where each item is a (number,description) touple"""
         if(self.oformat == "json"):
             print(json.dumps(data,indent=4))
         else:
@@ -125,42 +167,39 @@ class rema:
 
 
 #----------------------------------------------------------
-#- Command line
+#- Command line interface
 #----------------------------------------------------------
-
 @click.group()
 @click.argument('data', type=click.Path(exists=True))
-@click.option('--oformat',default=str,help="Output format, json or str")
+@click.option('--json',is_flag=True,help="Set JSON as output format")
 @click.pass_context
-def cli(ctx,data,oformat):
+def cli(ctx,data,json):
     ctx.ensure_object(dict)
     #Load the file
     r = rema(data)
-    r.oformat = oformat
+
+    if(json):
+        r.oformat = "json"
+    else:
+        r.oformat = "str"
     ctx.obj['rema'] = r
     
     
-@cli.command('group',help="Top items ordered by group")
+@cli.command('list',help="Sum and list items")
 @click.pass_context
 @click.option('--maxcount',default=10,help="Number of items to list")
 @click.option('--month',is_flag=True,help="Sort per month")
-def group(ctx,maxcount,month):
-    ctx.obj['rema'].printOrderByGroupOrCategory(maxcount,month,category = False)
+@click.option("--category",is_flag=True,help="Sort by categories.json file")
+@click.option("--item",help="Specify a certain group or category")
+@click.option("--plot",is_flag=True,help="Plot items")
+@click.option('--quarter',is_flag=True,help="Sort per quarter")
+def group(ctx,maxcount,month,category,item,plot,quarter):
+    ctx.obj['rema'].printOrderByGroupOrCategory(maxcount,month,category,item,plot,quarter)
 
-@cli.command('listgroup',help="List all groups")
+@cli.command('listgroups',help="List all groups")
 @click.pass_context
-def listgroup(ctx):
+def listgroups(ctx):
     ctx.obj['rema'].printGroups()
-
-
-@cli.command('category',help="Top items ordered by category")
-@click.pass_context
-@click.option('--maxcount',default=10,help="Number of items to list")
-@click.option('--month',is_flag=True,help="Sort per month")
-def category(ctx,maxcount,month):
-    ctx.obj['rema'].printOrderByGroupOrCategory(maxcount,month,category = True)
-
-    
 
 if __name__ == "__main__":
     cli(obj = {})
