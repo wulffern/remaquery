@@ -58,32 +58,50 @@ class rema:
             
         self.printList(groups)
 
-    def printOrderByCategory(self,maxcount=10):
+    def printOrderByGroupOrCategory(self,maxcount=10,month = False,category=False):
         summary = dict()
 
-        if self.categories is None:
-            print("Could not find categories.json. Can't run this command")
+        if self.categories is None and categeory:
+            print("Could not find categories.json. Can't run this command")  
 
-        
         transactions = self.obj["TransactionsInfo"]["Transactions"]
         for t in transactions:
             datestr= str(t["PurchaseDate"])
             d = datetime.datetime.utcfromtimestamp(int(datestr[:-3]))
-            year = d.year
-            month = d.month
-            header_key = str(year) + "-" + str(month)
+            if(month):
+                header_key = str(d.year) + "-" + str(d.month)
+            else:
+                header_key = str(d.year)
             if(header_key not in summary):
                 summary[header_key] = dict()
             for item in t["Receipt"]:
                 key = item["ProductGroupDescription"]
-                if(key in self.categories):
+                if(category and key in self.categories ):
                     key = self.categories[key]
                 if(key in summary[header_key]):
                     summary[header_key][key] += item["Amount"]
                 else:
                     summary[header_key][key] = item["Amount"]
         self.printTransactionSummary(summary,maxcount)
-        
+    
+    def printOrderByGroup(self,maxcount=10,month = False):
+        summary = dict()
+        transactions = self.obj["TransactionsInfo"]["Transactions"]
+        for t in transactions:
+            datestr= str(t["PurchaseDate"])
+            d = datetime.datetime.utcfromtimestamp(int(datestr[:-3]))
+            year = d.year
+            month = d.month
+            if(d.year not in summary):
+                summary[year] = dict()
+            for item in t["Receipt"]:
+                key = item["ProductGroupDescription"]
+                if(key in summary[year]):
+                    summary[year][key] += item["Amount"]
+                else:
+                    summary[year][key] = item["Amount"]
+
+        self.printTransactionSummary(summary,maxcount)
 
     def printTransactionSummary(self,summary,maxcount):
         data = OrderedDict()
@@ -100,23 +118,7 @@ class rema:
                 data[header_key].append((s[1],s[0]))
         self.printDictWithTouple(data)
 
-    def printOrderByGroup(self,maxcount=10):
-        summary = dict()
-        transactions = self.obj["TransactionsInfo"]["Transactions"]
-        for t in transactions:
-            datestr= str(t["PurchaseDate"])
-            d = datetime.datetime.utcfromtimestamp(int(datestr[:-3]))
-            year = d.year
-            if(d.year not in summary):
-                summary[year] = dict()
-            for item in t["Receipt"]:
-                key = item["ProductGroupDescription"]
-                if(key in summary[year]):
-                    summary[year][key] += item["Amount"]
-                else:
-                    summary[year][key] = item["Amount"]
-
-        self.printTransactionSummary(summary,maxcount)
+    
 
     def printList(self,data):
         if(self.oformat == "json"):
@@ -145,13 +147,13 @@ class rema:
 #----------------------------------------------------------
 
 @click.group()
-@click.argument('filename', type=click.Path(exists=True))
+@click.argument('data', type=click.Path(exists=True))
 @click.option('--oformat',default=str,help="Output format, json or str")
 @click.pass_context
-def cli(ctx,filename,oformat):
+def cli(ctx,data,oformat):
     ctx.ensure_object(dict)
     #Load the file
-    r = rema(filename)
+    r = rema(data)
     r.oformat = oformat
     ctx.obj['rema'] = r
     
@@ -159,8 +161,9 @@ def cli(ctx,filename,oformat):
 @cli.command('group',help="Top items ordered by group")
 @click.pass_context
 @click.option('--maxcount',default=10,help="Number of items to list")
-def group(ctx,maxcount):
-    ctx.obj['rema'].printOrderByGroup(maxcount)
+@click.option('--month',is_flag=True,help="Sort per month")
+def group(ctx,maxcount,month):
+    ctx.obj['rema'].printOrderByGroupOrCategory(maxcount,month,category = False)
 
 @cli.command('listgroup',help="List all groups")
 @click.pass_context
@@ -171,8 +174,9 @@ def listgroup(ctx):
 @cli.command('category',help="Top items ordered by category")
 @click.pass_context
 @click.option('--maxcount',default=10,help="Number of items to list")
-def category(ctx,maxcount):
-    ctx.obj['rema'].printOrderByCategory(maxcount)
+@click.option('--month',is_flag=True,help="Sort per month")
+def category(ctx,maxcount,month):
+    ctx.obj['rema'].printOrderByGroupOrCategory(maxcount,month,category = True)
 
     
 
