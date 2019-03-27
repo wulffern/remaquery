@@ -61,7 +61,7 @@ class rema:
     def printOrderByGroupOrCategory(self,maxcount=10,month = False,category=False):
         summary = dict()
 
-        if self.categories is None and categeory:
+        if self.categories is None and category:
             print("Could not find categories.json. Can't run this command")  
 
         transactions = self.obj["TransactionsInfo"]["Transactions"]
@@ -84,24 +84,6 @@ class rema:
                     summary[header_key][key] = item["Amount"]
         self.printTransactionSummary(summary,maxcount)
     
-    def printOrderByGroup(self,maxcount=10,month = False):
-        summary = dict()
-        transactions = self.obj["TransactionsInfo"]["Transactions"]
-        for t in transactions:
-            datestr= str(t["PurchaseDate"])
-            d = datetime.datetime.utcfromtimestamp(int(datestr[:-3]))
-            year = d.year
-            month = d.month
-            if(d.year not in summary):
-                summary[year] = dict()
-            for item in t["Receipt"]:
-                key = item["ProductGroupDescription"]
-                if(key in summary[year]):
-                    summary[year][key] += item["Amount"]
-                else:
-                    summary[year][key] = item["Amount"]
-
-        self.printTransactionSummary(summary,maxcount)
 
     def printTransactionSummary(self,summary,maxcount):
         data = OrderedDict()
@@ -111,7 +93,7 @@ class rema:
             listofTuples = sorted(transactions.items() ,reverse = True,  key=lambda x: x[1])
             count = 0
             for s in listofTuples:
-                if(count > maxcount):
+                if(count >= maxcount):
                     continue
                 else:
                     count += 1
